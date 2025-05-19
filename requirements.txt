@@ -1,0 +1,5 @@
+flask
+pymongo
+numpy
+sentence-transformers
+faiss-cpu

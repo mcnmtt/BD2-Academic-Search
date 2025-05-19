@@ -1,52 +1,45 @@
-# Prerequisites
-*.d
-
-# Object files
-*.o
-*.ko
-*.obj
-*.elf
-
-# Linker output
-*.ilk
-*.map
-*.exp
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
-
-# Shared objects (inc. Windows DLLs)
-*.dll
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
 *.so
-*.so.*
-*.dylib
+*.egg-info/
+*.egg
+*.log
 
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
+# === Environment ===
+.env
+.venv/
+venv/
+ENV/
+env/
+*.env
+*.DS_Store
 
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
+# === Bytecode cache ===
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
 
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
+# === OS ===
+Thumbs.db
+.DS_Store
+ehthumbs.db
+Icon?
+
+# === IDE / Editor ===
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# === FAISS & data files ===
+*.index
+*.npy
+*.h5
+*.pkl
+*.dat
+*.bin
+

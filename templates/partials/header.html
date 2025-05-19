@@ -1,0 +1,23 @@
+<header style="background-color: #e4e5e0; margin-bottom: 20px; position: sticky; top: 0; z-index: 1000; height: 100px; overflow: hidden;"
+        class="shadow-sm">
+  <div class="container-fluid h-100 d-flex align-items-center justify-content-between">
+
+    <!-- Placeholder sinistro -->
+    <div style="width: 300px;"></div>
+
+    <!-- Logo centrato (non aumenta altezza header) -->
+    <a href="/" class="text-decoration-none d-flex align-items-center h-100">
+      <img src="{{ url_for('static', filename='logo.svg') }}" alt="BD² Logo"
+           style="max-height: 100%; object-fit: contain;">
+    </a>
+
+    <!-- Barra di ricerca destra -->
+    <form action="/search" method="get" class="d-flex" role="search" style="max-width: 300px; width: 100%;">
+      <input type="text" name="q" class="form-control form-control-sm me-2"
+             placeholder="Search by title, author or category" required>
+      <button class="btn btn-sm btn-outline-light" type="submit"
+              style="color: #003366; border-color: #003366;">Search</button>
+    </form>
+
+  </div>
+</header>
