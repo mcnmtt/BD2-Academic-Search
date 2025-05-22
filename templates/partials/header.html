@@ -1,23 +1,91 @@
-<header style="background-color: #e4e5e0; margin-bottom: 20px; position: sticky; top: 0; z-index: 1000; height: 100px; overflow: hidden;"
-        class="shadow-sm">
+<header style="background-color: #e4e5e0; margin-bottom: 20px; position: sticky; top: 0; z-index: 1000; height: 100px; overflow: hidden;" class="shadow-sm">
+
+  <style>
+    .header-search-box {
+      display: flex;
+      align-items: center;
+      background: white;
+      padding: 8px 16px;
+      border-radius: 50px;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .header-search-box input {
+      border: none;
+      outline: none;
+      flex: 1;
+      font-size: 0.95rem;
+      padding: 8px;
+      background: none;
+    }
+
+    .header-search-box button {
+      background-color: #0066cc;
+      color: white;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s ease;
+    }
+
+    .header-search-box button:hover {
+      background: #0050a0;
+    }
+
+    .btn-custom-login {
+      background-color: #0066cc;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: bold;
+      text-decoration: none;
+      transition: background 0.3s;
+    }
+
+    .btn-custom-login:hover {
+      background-color: #004c99;
+    }
+
+    .btn-custom-logout {
+      background-color: #cc0000;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: bold;
+      text-decoration: none;
+      transition: background 0.3s;
+    }
+
+    .btn-custom-logout:hover {
+      background-color: #990000;
+    }
+  </style>
+
   <div class="container-fluid h-100 d-flex align-items-center justify-content-between">
 
-    <!-- Placeholder sinistro -->
-    <div style="width: 300px;"></div>
+    <!-- COLONNA SINISTRA: Search bar integrata -->
+    <form action="/search" method="get" class="header-search-box" style="max-width: 300px; width: 100%;">
+      <input type="text" name="q" placeholder="Search by title, author or category" required>
+      <button type="submit">Search</button>
+    </form>
 
-    <!-- Logo centrato (non aumenta altezza header) -->
+    <!-- COLONNA CENTRALE: Logo sempre centrato -->
     <a href="/" class="text-decoration-none d-flex align-items-center h-100">
       <img src="{{ url_for('static', filename='logo.svg') }}" alt="BD² Logo"
            style="max-height: 100%; object-fit: contain;">
     </a>
 
-    <!-- Barra di ricerca destra -->
-    <form action="/search" method="get" class="d-flex" role="search" style="max-width: 300px; width: 100%;">
-      <input type="text" name="q" class="form-control form-control-sm me-2"
-             placeholder="Search by title, author or category" required>
-      <button class="btn btn-sm btn-outline-light" type="submit"
-              style="color: #003366; border-color: #003366;">Search</button>
-    </form>
+    <!-- COLONNA DESTRA: Login/Logout -->
+    <div style="width: 300px;" class="d-flex justify-content-end align-items-center">
+      {% if session.admin %}
+        <span class="me-3 text-success fw-bold">Logged as Admin</span>
+        <a href="/logout" class="btn-custom-logout">Logout</a>
+      {% else %}
+        <a href="/login" class="btn-custom-login">Login</a>
+      {% endif %}
+    </div>
 
   </div>
 </header>

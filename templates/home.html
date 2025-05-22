@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BD² - Academic Search</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
   <style>
     * {
       margin: 0;
@@ -19,6 +20,28 @@
       display: flex;
       flex-direction: column;
       min-height: 100vh;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: flex-end;
+      padding: 20px;
+    }
+
+    .topbar a,
+    .topbar span {
+      text-decoration: none;
+      background-color: #0066cc;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: bold;
+      transition: background 0.3s;
+      margin-left: 10px;
+    }
+
+    .topbar a:hover {
+      background-color: #004c99;
     }
 
     .container {
@@ -67,9 +90,40 @@
     .search-box button:hover {
       background: #0050a0;
     }
+
+    .flash-message {
+      background-color: #d4edda;
+      color: #155724;
+      padding: 10px;
+      border-radius: 6px;
+      text-align: center;
+      margin: 10px auto;
+      width: fit-content;
+    }
   </style>
 </head>
 <body>
+
+  <!-- TOPBAR dinamica -->
+  <div class="topbar">
+    {% if session.admin %}
+      <span>Logged as Admin</span>
+      <a href="/logout" style="background-color: #cc0000;">Logout</a>
+    {% else %}
+      <a href="/login">Login</a>
+    {% endif %}
+  </div>
+
+  <!-- MESSAGGIO FLASH -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="flash-message">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <!-- LOGO E SEARCH -->
   <div class="container">
     <img class="logo" src="static/logo.svg" alt="BD² logo">
     <form class="search-box" action="/search" method="get">
@@ -78,12 +132,13 @@
     </form>
   </div>
 
-  <!-- Footer con logo UNISA -->
+  <!-- FOOTER -->
   <footer style="margin-top: auto; padding: 30px 0; text-align: center;">
     <p style="margin-bottom: 10px; font-size: 0.95rem; color: #444;">
-      Progetto realizzato per il corso di <strong>Base di Dati 2</strong>
+      Progetto realizzato per il corso di <strong>Basi di Dati 2</strong>
     </p>
     <img src="{{ url_for('static', filename='logo-unisa.png') }}" alt="Logo UNISA" style="max-height: 80px;">
   </footer>
 </body>
 </html>
+

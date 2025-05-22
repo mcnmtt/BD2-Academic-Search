@@ -1,17 +1,20 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, session, redirect, url_for, flash
 from pymongo import MongoClient
+import bcrypt
 import math
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
 app = Flask(__name__)
+app.secret_key = "una-chiave-super-segreta"  # cambia con una chiave forte
 
 # === DB e FAISS CONFIG ===
 client = MongoClient("mongodb://172.17.224.1:27017")
 db = client["arxiv_db"]
 papers_collection = db["papers"]
 categories_collection = db["categories"]
+users_collection = db["users"]
 
 INDEX_FILE = "faiss_papers_ivfflat.index"
 IDS_FILE = "paper_ids.npy"
@@ -40,7 +43,7 @@ def get_related_papers(paper_id):
     index, ids = load_index_and_ids()
     emb = get_embedding_by_id(papers_collection, paper_id)
     if emb is None:
-        return []
+        return [] 
 
     emb = emb.reshape(1, -1)
     faiss.normalize_L2(emb)
@@ -66,6 +69,30 @@ def get_related_papers(paper_id):
 @app.route("/")
 def home():
     return render_template("home.html")
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        next_page = request.form.get("next") or url_for("home")
+
+        user = users_collection.find_one({"username": username})
+        if user and bcrypt.checkpw(password.encode('utf-8'), user["password"]):
+            session["admin"] = True
+            return redirect(next_page)
+        else:
+            return render_template("login.html", error="Credenziali errate.", next=next_page)
+
+    next_page = request.args.get("next") or request.referrer or url_for("home")
+    return render_template("login.html", next=next_page)
+
+
+@app.route("/logout")
+def logout():
+    next_page = request.referrer or url_for("home")
+    session.pop("admin", None)
+    return redirect(next_page)
 
 @app.route("/search")
 def search():
@@ -100,7 +127,7 @@ def search():
             "authors": paper.get("authors"),
             "update_date": paper.get("update_date"),
             "category_title": category_title,
-            "abstract": paper.get("abstract", "").strip()[:450] + "...",
+            "abstract": paper.get("abstract", "").strip()[:],
             "doi": paper.get("doi")
         })
 
@@ -113,6 +140,54 @@ def search():
         block_start=block_start,
         block_end=block_end
     )
+
+@app.route("/admin/delete/<paper_id>", methods=["POST"])
+def delete_paper(paper_id):
+    if not session.get("admin"):
+        flash("Access denied.", "danger")
+        return redirect(url_for("home"))
+
+    result = papers_collection.delete_one({"id": paper_id})
+    if result.deleted_count:
+        flash("Paper successfully eliminated.", "success")
+    else:
+        flash("Error: paper not found.", "danger")
+
+    return redirect(request.referrer or url_for("home"))
+
+@app.route("/admin/edit/<paper_id>", methods=["GET", "POST"])
+def edit_paper(paper_id):
+    if not session.get("admin"):
+        flash("Unauthorized access.", "danger")
+        return redirect(url_for("home"))
+
+    paper = papers_collection.find_one({"id": paper_id})
+    if not paper:
+        flash("Paper not found.", "danger")
+        return redirect(url_for("home"))
+
+    if request.method == "POST":
+        # Aggiorna i campi modificabili
+        updated = {
+            "title": request.form["title"],
+            "authors": request.form["authors"],
+            "doi": request.form["doi"],
+            "categories": request.form["category"]
+        }
+
+        papers_collection.update_one({"id": paper_id}, {"$set": updated})
+        flash("Paper updated successfully.", "success")
+
+        # Recupera destinazione per redirect (pagina precedente)
+        next_page = request.form.get("next") or url_for("search", q=paper["title"])
+        return redirect(next_page)
+
+    # Metodo GET → mostra il form precompilato
+    categories = list(categories_collection.find())
+
+    # Recupera pagina precedente per tornare indietro
+    next_page = request.args.get("next") or request.referrer or url_for("home")
+    return render_template("edit_paper.html", paper=paper, categories=categories, next=next_page)
 
 @app.route("/related/<paper_id>")
 def related(paper_id):
