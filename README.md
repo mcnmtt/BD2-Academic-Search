@@ -5,22 +5,10 @@
 PROGETTO BASI DI DATI 2
 
 prof.ssa Tortora, prof. Di Biasi
-
-</h2>
-<p align="center">
-Mattia Maucioni <br>
-Antonio Landi
-</p>
-</h2>
-
-# BD² - Academic Search
+<h1 align="center"> BD² - Academic Search <h2 align="center">
 
 **BD²** è un portale di ricerca accademica sviluppato per il corso di *Basi di Dati 2*, progettato per esplorare e visualizzare pubblicazioni scientifiche (es. da arXiv), con funzionalità avanzate di ricerca testuale e raccomandazione basata su similarità semantica tra paper.
-
-![Logo BD²](static/logo.svg)
-
 ---
-
 ## 🚀 Funzionalità principali
 
 - 🔍 **Ricerca full-text** per titolo, autori, abstract e categorie.
@@ -107,7 +95,7 @@ python app.py
 
 - **Mattia Maucioni**
 - **Antonio Landi**
-Università degli Studi di Salerno  
+- Università degli Studi di Salerno  
   *Data Science & Machine Learning – Corso di Laurea Magistrale in Informatica*
 
 ---
