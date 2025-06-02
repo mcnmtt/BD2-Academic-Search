@@ -7,7 +7,9 @@ PROGETTO BASI DI DATI 2
 prof.ssa Tortora, prof. Di Biasi
 <h1 align="center"> BD² - Academic Search <h2 align="center">
 
-**BD²** è un portale di ricerca accademica sviluppato per il corso di *Basi di Dati 2*, progettato per esplorare e visualizzare pubblicazioni scientifiche (es. da arXiv), con funzionalità avanzate di ricerca testuale e raccomandazione basata su similarità semantica tra paper.
+<img width="300" src="https://raw.githubusercontent.com/mcnmtt/BD2-Academic-Search/d8e45515d55185bc262b7b47c91b97e6ae2c3473/static/logo.svg" alt="Logo BD2">
+
+BD² è un portale di ricerca accademica sviluppato per il corso di *Basi di Dati 2*, progettato per esplorare e visualizzare pubblicazioni scientifiche (es. da arXiv), con funzionalità avanzate di ricerca testuale e raccomandazione basata su similarità semantica tra paper.
 ---
 ## 🚀 Funzionalità principali
 
