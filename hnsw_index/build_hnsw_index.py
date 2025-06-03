@@ -10,7 +10,7 @@ COLLECTION = "papers"
 DIM = 384
 INDEX_PATH = "hnsw_papers.index"
 IDS_PATH = "paper_ids.npy"
-BATCH_SIZE = 100_000
+BATCH_SIZE = 50_000
 
 # Connessione a MongoDB
 client = MongoClient(MONGO_URI)

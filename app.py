@@ -9,7 +9,6 @@ from sentence_transformers import SentenceTransformer
 
 from datetime import datetime
 
-
 app = Flask(__name__)
 app.secret_key = 'b4b91b05e5e8491eb7a90cf536ad2dd927e48cc61dca5212ad9e3d03ec223f2d'
 
@@ -20,11 +19,12 @@ papers_collection = db["papers"]
 categories_collection = db["categories"]
 users_collection = db["users"]
 
-INDEX_FILE = r"hnsw_index\hnsw_papers.index"
-IDS_FILE = r"hnsw_index\paper_ids.npy"
+INDEX_FILE = os.path.join("hnsw_index", "hnsw_papers.index")
+IDS_FILE = os.path.join("hnsw_index", "paper_ids.npy")
 TOP_K = 5
 DIM = 384
 model = SentenceTransformer("all-MiniLM-L6-v2")
+
 
 def parse_authors(authors_str: str) -> list:
     """
@@ -123,10 +123,11 @@ def logout():
 def search():
     query = request.args.get("q", "").strip()
     page = int(request.args.get("page", 1))
-    per_page = 100
+    per_page = 50
 
     if not query:
-        return render_template("results.html", results=[], query=query, total_pages=0, current_page=1, block_start=1, block_end=1)
+        return render_template("results.html", results=[], query=query, total_pages=0, current_page=1, block_start=1,
+                               block_end=1)
 
     category_map = {cat["id"]: cat["title"] for cat in categories_collection.find()}
 
@@ -139,7 +140,7 @@ def search():
         ]
     }
 
-    papers_all = list(papers_collection.find(mongo_query).limit(1000))
+    papers_all = list(papers_collection.find(mongo_query).limit(500))
     total_results = len(papers_all)
     total_pages = math.ceil(total_results / per_page)
 
@@ -174,7 +175,7 @@ def delete_paper(paper_id):
 
     # Rimuovi dal DB
     result = papers_collection.delete_one({"id": paper_id})
-    
+
     if result.deleted_count:
         try:
             # === Rimuovi dall'indice HNSW ===
@@ -229,6 +230,7 @@ def edit_paper(paper_id):
     return render_template("edit_paper.html", paper=paper, categories=categories,
                            next=request.args.get("next") or request.referrer or url_for("home"))
 
+
 @app.route("/admin/add", methods=["GET", "POST"])
 def add_paper():
     if not session.get("admin"):
@@ -236,18 +238,18 @@ def add_paper():
         return redirect(url_for("home"))
 
     if request.method == "POST":
-        paper_id       = request.form.get("id", "").strip()
-        title          = request.form.get("title", "").strip()
-        category_id    = request.form.get("category", "").strip()
-        authors_raw    = request.form.get("authors", "").strip()
-        abstract       = request.form.get("abstract", "").strip()
+        paper_id = request.form.get("id", "").strip()
+        title = request.form.get("title", "").strip()
+        category_id = request.form.get("category", "").strip()
+        authors_raw = request.form.get("authors", "").strip()
+        abstract = request.form.get("abstract", "").strip()
         update_date_str = request.form.get("update_date", "").strip()
 
-        submitter      = request.form.get("submitter", "").strip()
-        comments       = request.form.get("comments", "").strip()
-        journal_ref    = request.form.get("journal_ref", "").strip()
-        doi            = request.form.get("doi", "").strip()
-        report_no      = request.form.get("report_no", "").strip()
+        submitter = request.form.get("submitter", "").strip()
+        comments = request.form.get("comments", "").strip()
+        journal_ref = request.form.get("journal_ref", "").strip()
+        doi = request.form.get("doi", "").strip()
+        report_no = request.form.get("report_no", "").strip()
 
         # Validazioni
         missing = []
@@ -337,6 +339,7 @@ def add_paper():
     # Se GET → mostra il form
     categories = list(categories_collection.find())
     return render_template("add_paper.html", categories=categories, form_data={})
+
 
 @app.route("/related/<paper_id>")
 def related(paper_id):
