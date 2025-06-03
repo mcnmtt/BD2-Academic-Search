@@ -229,7 +229,6 @@ def edit_paper(paper_id):
     return render_template("edit_paper.html", paper=paper, categories=categories,
                            next=request.args.get("next") or request.referrer or url_for("home"))
 
-
 @app.route("/admin/add", methods=["GET", "POST"])
 def add_paper():
     if not session.get("admin"):
@@ -237,7 +236,6 @@ def add_paper():
         return redirect(url_for("home"))
 
     if request.method == "POST":
-        # 1) Raccolta dati dal form
         paper_id       = request.form.get("id", "").strip()
         title          = request.form.get("title", "").strip()
         category_id    = request.form.get("category", "").strip()
@@ -245,14 +243,13 @@ def add_paper():
         abstract       = request.form.get("abstract", "").strip()
         update_date_str = request.form.get("update_date", "").strip()
 
-        # Campi opzionali
         submitter      = request.form.get("submitter", "").strip()
         comments       = request.form.get("comments", "").strip()
         journal_ref    = request.form.get("journal_ref", "").strip()
         doi            = request.form.get("doi", "").strip()
         report_no      = request.form.get("report_no", "").strip()
 
-        # 2) Validazioni di base
+        # Validazioni
         missing = []
         if not paper_id:
             missing.append("ID del Paper")
@@ -285,10 +282,18 @@ def add_paper():
         except ValueError:
             update_date = datetime.utcnow().date().isoformat()
 
-        # Parsing autori (uno per riga)
         authors_list = parse_authors(authors_raw)
 
-        # 3) Costruzione documento MongoDB
+        # Calcolo embedding
+        try:
+            embedding_np = model.encode(abstract).astype(np.float32)
+            embedding_list = embedding_np.tolist()
+        except Exception as e:
+            flash(f"Errore nel calcolo embedding: {str(e)}", "danger")
+            categories = list(categories_collection.find())
+            return render_template("add_paper.html", categories=categories, form_data=request.form)
+
+        # Documento finale
         new_doc = {
             "id": paper_id,
             "submitter": submitter or None,
@@ -304,19 +309,10 @@ def add_paper():
             "abstract": abstract,
             "update_date": update_date,
             "versions": [],
-            "embedding": None
+            "embedding": embedding_list
         }
 
-        # 4) Calcolo embedding
-        try:
-            emb_np = model.encode(abstract).astype(np.float32)
-            new_doc["embedding"] = emb_np.tolist()
-        except Exception as e:
-            flash(f"Errore nel calcolo embedding: {str(e)}", "danger")
-            categories = list(categories_collection.find())
-            return render_template("add_paper.html", categories=categories, form_data=request.form)
-
-        # 5) Inserimento in MongoDB
+        # Inserimento nel DB
         try:
             papers_collection.insert_one(new_doc)
         except Exception as e:
@@ -324,26 +320,23 @@ def add_paper():
             categories = list(categories_collection.find())
             return render_template("add_paper.html", categories=categories, form_data=request.form)
 
-        # 6) Inserimento in HNSW
+        # Inserimento nell'indice HNSW
         try:
             index, ids = load_index_and_ids()
-            new_internal_id = len(ids)
-            index.add_items(np.array([emb_np], dtype=np.float32), np.array([new_internal_id], dtype=np.int64))
-            ids_list = list(ids)
-            ids_list.append(paper_id)
-            save_index_and_ids(index, ids_list)
+            new_index = len(ids)
+            index.add_items(np.array([embedding_np]), np.array([new_index]))
+            ids = np.append(ids, paper_id)
+            save_index_and_ids(index, ids)
         except Exception as e:
             flash(f"Paper inserito in DB ma errore indicizzazione HNSW: {str(e)}", "warning")
             return redirect(url_for("home"))
 
-        # 7) Tutto OK
         flash(f"Paper '{paper_id}' inserito correttamente e indicizzato.", "success")
         return redirect(url_for("home"))
 
     # Se GET → mostra il form
     categories = list(categories_collection.find())
     return render_template("add_paper.html", categories=categories, form_data={})
-
 
 @app.route("/related/<paper_id>")
 def related(paper_id):

@@ -4,7 +4,7 @@ from pymongo import MongoClient
 from tqdm import tqdm
 
 # Configurazione
-MONGO_URI = "mongodb://172.17.224.1:27017"
+MONGO_URI = "mongodb://localhost:27017"
 DB_NAME = "arxiv_db"
 COLLECTION = "papers"
 DIM = 384
@@ -34,7 +34,8 @@ for doc in tqdm(cursor, desc="Validating + Indexing"):
     if isinstance(emb, list) and len(emb) == DIM:
         if index is None:
             index = hnswlib.Index(space="cosine", dim=DIM)
-            index.init_index(max_elements=collection.estimated_document_count(), ef_construction=200, M=16)
+            count_with_embedding = collection.count_documents({"embedding": {"$exists": True}})
+            index.init_index(max_elements=count_with_embedding + 1000, ef_construction=200, M=16)
             index.set_ef(50)
 
         batch_data.append(np.array(emb, dtype=np.float32))
