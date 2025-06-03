@@ -123,7 +123,7 @@ def logout():
 def search():
     query = request.args.get("q", "").strip()
     page = int(request.args.get("page", 1))
-    per_page = 100
+    per_page = 50
 
     if not query:
         return render_template("results.html", results=[], query=query, total_pages=0, current_page=1, block_start=1, block_end=1)
@@ -139,7 +139,7 @@ def search():
         ]
     }
 
-    papers_all = list(papers_collection.find(mongo_query).limit(1000))
+    papers_all = list(papers_collection.find(mongo_query).limit(500))
     total_results = len(papers_all)
     total_pages = math.ceil(total_results / per_page)
 
