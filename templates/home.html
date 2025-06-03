@@ -7,6 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
   <style>
+    /* Reset e font */
     * {
       margin: 0;
       padding: 0;
@@ -22,6 +23,7 @@
       min-height: 100vh;
     }
 
+    /* Topbar: rimane solo Login/Logout */
     .topbar {
       display: flex;
       justify-content: flex-end;
@@ -38,32 +40,44 @@
       font-weight: bold;
       transition: background 0.3s;
       margin-left: 10px;
+      font-size: 0.9rem;
+    }
+
+    .topbar a.logout {
+      background-color: #cc0000;
+    }
+    .topbar a.logout:hover {
+      background-color: #990000;
     }
 
     .topbar a:hover {
       background-color: #004c99;
     }
 
+    /* Contenitore centrale */
     .container {
       margin: auto;
       display: flex;
       flex-direction: column;
       align-items: center;
       text-align: center;
+      padding: 20px; /* un po’ di spazio in alto e in basso */
     }
 
+    /* Logo BD² */
     .logo {
       width: 550px;
-      margin-bottom: 10px;
+      margin-bottom: 20px;
     }
 
+    /* Search box */
     .search-box {
       width: 100%;
       max-width: 600px;
       background: white;
-      padding: 10px 20px;
+      padding: 12px 24px;
       border-radius: 50px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
       display: flex;
       align-items: center;
     }
@@ -73,24 +87,52 @@
       outline: none;
       flex: 1;
       font-size: 1rem;
-      padding: 10px;
+      padding: 12px;
     }
 
     .search-box button {
       border: none;
       background: #0066cc;
       color: white;
-      padding: 10px 20px;
+      padding: 10px 24px;
       border-radius: 50px;
       cursor: pointer;
       font-weight: 600;
       transition: background 0.2s ease;
+      font-size: 1rem;
     }
 
     .search-box button:hover {
       background: #0050a0;
     }
 
+    /* Pulsante Aggiungi Paper (solo per admin) */
+    .add-paper-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 24px;
+      background-color: #e0e0e0;    /* grigio più scuro dello sfondo */
+      color: #333;                  /* testo scuro */
+      padding: 10px 24px;
+      border: none;
+      border-radius: 30px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s ease;
+    }
+    .add-paper-btn:hover {
+      background-color: #cccccc;    /* leggermente più scuro al passaggio */
+    }
+    .add-paper-btn .plus-icon {
+      font-weight: 700;
+      margin-right: 8px;
+      font-size: 1.2rem;
+    }
+
+    /* Flash message */
     .flash-message {
       background-color: #d4edda;
       color: #155724;
@@ -99,22 +141,38 @@
       text-align: center;
       margin: 10px auto;
       width: fit-content;
+      font-size: 0.95rem;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: auto;
+      padding: 30px 0;
+      text-align: center;
+    }
+    footer p {
+      margin-bottom: 10px;
+      font-size: 0.95rem;
+      color: #444;
+    }
+    footer img {
+      max-height: 80px;
     }
   </style>
 </head>
 <body>
 
-  <!-- TOPBAR dinamica -->
+  <!-- ================= TOPBAR ================= -->
   <div class="topbar">
     {% if session.admin %}
       <span>Logged as Admin</span>
-      <a href="/logout" style="background-color: #cc0000;">Logout</a>
+      <a href="{{ url_for('logout') }}" class="logout">Logout</a>
     {% else %}
-      <a href="/login">Login</a>
+      <a href="{{ url_for('login') }}">Login</a>
     {% endif %}
   </div>
 
-  <!-- MESSAGGIO FLASH -->
+  <!-- =============== FLASH MESSAGE =============== -->
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
       {% for category, message in messages %}
@@ -123,21 +181,30 @@
     {% endif %}
   {% endwith %}
 
-  <!-- LOGO E SEARCH -->
+  <!-- ================= CONTENUTO PRINCIPALE ================= -->
   <div class="container">
-    <img class="logo" src="static/logo.svg" alt="BD² logo">
-    <form class="search-box" action="/search" method="get">
+    <!-- Logo / Titolo -->
+    <img class="logo" src="{{ url_for('static', filename='logo.svg') }}" alt="BD² logo">
+
+    <!-- Barra di ricerca -->
+    <form class="search-box" action="{{ url_for('search') }}" method="get">
       <input type="text" name="q" placeholder="Search by title, author, or category" required>
       <button type="submit">Search</button>
     </form>
+
+    <!-- Bottone “+ Aggiungi Paper” appare solo se admin -->
+    {% if session.admin %}
+      <a href="{{ url_for('add_paper') }}" class="add-paper-btn">
+        <span class="plus-icon">＋</span> <!-- Puoi anche usare “+” normale -->
+        Aggiungi Paper
+      </a>
+    {% endif %}
   </div>
 
-  <!-- FOOTER -->
-  <footer style="margin-top: auto; padding: 30px 0; text-align: center;">
-    <p style="margin-bottom: 10px; font-size: 0.95rem; color: #444;">
-      Progetto realizzato per il corso di <strong>Basi di Dati 2</strong>
-    </p>
-    <img src="{{ url_for('static', filename='logo-unisa.png') }}" alt="Logo UNISA" style="max-height: 80px;">
+  <!-- ================= FOOTER ================= -->
+  <footer>
+    <p>Progetto realizzato per il corso di <strong>Basi di Dati 2</strong></p>
+    <img src="{{ url_for('static', filename='logo-unisa.png') }}" alt="Logo UNISA">
   </footer>
 </body>
 </html>

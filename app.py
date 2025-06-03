@@ -7,6 +7,9 @@ import hnswlib
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
+from datetime import datetime
+
+
 app = Flask(__name__)
 app.secret_key = 'b4b91b05e5e8491eb7a90cf536ad2dd927e48cc61dca5212ad9e3d03ec223f2d'
 
@@ -22,6 +25,19 @@ IDS_FILE = r"hnsw_index\paper_ids.npy"
 TOP_K = 5
 DIM = 384
 model = SentenceTransformer("all-MiniLM-L6-v2")
+
+def parse_authors(authors_str: str) -> list:
+    """
+    Converte la stringa di autori (uno per riga) in lista di stringhe.
+    Esempio:
+      "C. Balázs
+       E. Berger
+       P. M. Nadolsky"
+    → ["C. Balázs", "E. Berger", "P. M. Nadolsky"]
+    """
+    if not authors_str:
+        return []
+    return [riga.strip() for riga in authors_str.splitlines() if riga.strip()]
 
 
 # === FUNZIONI PER SIMILARITÀ ===
@@ -162,7 +178,7 @@ def delete_paper(paper_id):
     if result.deleted_count:
         try:
             # === Rimuovi dall'indice HNSW ===
-            index = hnswlib.Index(space="cosine", dim=384)
+            index = hnswlib.Index(space="cosine", dim=DIM)
             index.load_index(INDEX_FILE)
             ids = list(np.load(IDS_FILE, allow_pickle=True))
 
@@ -214,33 +230,119 @@ def edit_paper(paper_id):
                            next=request.args.get("next") or request.referrer or url_for("home"))
 
 
-@app.route("/admin/add", methods=["POST"])
+@app.route("/admin/add", methods=["GET", "POST"])
 def add_paper():
     if not session.get("admin"):
         flash("Unauthorized access.", "danger")
         return redirect(url_for("home"))
 
-    data = request.json
-    required_fields = ["id", "title", "authors", "abstract", "categories"]
+    if request.method == "POST":
+        # 1) Raccolta dati dal form
+        paper_id       = request.form.get("id", "").strip()
+        title          = request.form.get("title", "").strip()
+        category_id    = request.form.get("category", "").strip()
+        authors_raw    = request.form.get("authors", "").strip()
+        abstract       = request.form.get("abstract", "").strip()
+        update_date_str = request.form.get("update_date", "").strip()
 
-    if not all(field in data for field in required_fields):
-        return {"error": "Missing required fields"}, 400
+        # Campi opzionali
+        submitter      = request.form.get("submitter", "").strip()
+        comments       = request.form.get("comments", "").strip()
+        journal_ref    = request.form.get("journal_ref", "").strip()
+        doi            = request.form.get("doi", "").strip()
+        report_no      = request.form.get("report_no", "").strip()
 
-    # Calcolo embedding
-    embedding = model.encode(data["abstract"]).astype(np.float32).tolist()
-    data["embedding"] = embedding
+        # 2) Validazioni di base
+        missing = []
+        if not paper_id:
+            missing.append("ID del Paper")
+        if not title:
+            missing.append("Titolo")
+        if not category_id:
+            missing.append("Categoria")
+        if not abstract:
+            missing.append("Abstract")
+        if missing:
+            flash(f"Errore: mancano i campi obbligatori: {', '.join(missing)}.", "danger")
+            categories = list(categories_collection.find())
+            return render_template("add_paper.html", categories=categories, form_data=request.form)
 
-    # Inserimento nel DB
-    papers_collection.insert_one(data)
+        if papers_collection.find_one({"id": paper_id}):
+            flash(f"Errore: esiste già un paper con id = {paper_id}.", "danger")
+            categories = list(categories_collection.find())
+            return render_template("add_paper.html", categories=categories, form_data=request.form)
 
-    # Inserimento in HNSW
-    index, ids = load_index_and_ids()
-    new_index = len(ids)
-    index.add_items(np.array([embedding], dtype=np.float32), np.array([new_index]))
-    ids = np.append(ids, data["id"])
-    save_index_and_ids(index, ids)
+        if not categories_collection.find_one({"id": category_id}):
+            flash(f"Errore: la categoria '{category_id}' non esiste.", "danger")
+            categories = list(categories_collection.find())
+            return render_template("add_paper.html", categories=categories, form_data=request.form)
 
-    return {"status": "success", "message": "Paper added and indexed successfully."}, 201
+        try:
+            if update_date_str:
+                update_date = datetime.strptime(update_date_str, "%Y-%m-%d").date().isoformat()
+            else:
+                raise ValueError
+        except ValueError:
+            update_date = datetime.utcnow().date().isoformat()
+
+        # Parsing autori (uno per riga)
+        authors_list = parse_authors(authors_raw)
+
+        # 3) Costruzione documento MongoDB
+        new_doc = {
+            "id": paper_id,
+            "submitter": submitter or None,
+            "authors": authors_raw or None,
+            "authors_parsed": authors_list,
+            "title": title,
+            "comments": comments or None,
+            "journal-ref": journal_ref or None,
+            "doi": doi or None,
+            "report-no": report_no or None,
+            "categories": category_id,
+            "license": None,
+            "abstract": abstract,
+            "update_date": update_date,
+            "versions": [],
+            "embedding": None
+        }
+
+        # 4) Calcolo embedding
+        try:
+            emb_np = model.encode(abstract).astype(np.float32)
+            new_doc["embedding"] = emb_np.tolist()
+        except Exception as e:
+            flash(f"Errore nel calcolo embedding: {str(e)}", "danger")
+            categories = list(categories_collection.find())
+            return render_template("add_paper.html", categories=categories, form_data=request.form)
+
+        # 5) Inserimento in MongoDB
+        try:
+            papers_collection.insert_one(new_doc)
+        except Exception as e:
+            flash(f"Errore durante inserimento in DB: {str(e)}", "danger")
+            categories = list(categories_collection.find())
+            return render_template("add_paper.html", categories=categories, form_data=request.form)
+
+        # 6) Inserimento in HNSW
+        try:
+            index, ids = load_index_and_ids()
+            new_internal_id = len(ids)
+            index.add_items(np.array([emb_np], dtype=np.float32), np.array([new_internal_id], dtype=np.int64))
+            ids_list = list(ids)
+            ids_list.append(paper_id)
+            save_index_and_ids(index, ids_list)
+        except Exception as e:
+            flash(f"Paper inserito in DB ma errore indicizzazione HNSW: {str(e)}", "warning")
+            return redirect(url_for("home"))
+
+        # 7) Tutto OK
+        flash(f"Paper '{paper_id}' inserito correttamente e indicizzato.", "success")
+        return redirect(url_for("home"))
+
+    # Se GET → mostra il form
+    categories = list(categories_collection.find())
+    return render_template("add_paper.html", categories=categories, form_data={})
 
 
 @app.route("/related/<paper_id>")
