@@ -1,10 +1,20 @@
 {% for paper in related_papers %}
 <div class="card mt-2 mb-2 border-start border-primary border-3">
   <div class="card-body p-2">
-    <h6 class="card-title">{{ paper.title }}</h6>
+    <h6 class="card-title">{{ paper.title|safe }}</h6>
     <p class="mb-1"><small>{{ paper.authors }}</small></p>
+    <p class="mb-1"><small><strong>Similarity:</strong> {{ paper.similarity }}</small></p>
+    <p class="mb-2 text-muted">
+      <small>{{ paper.abstract[:100]|safe }}{% if paper.abstract|length > 100 %}...{% endif %}</small>
+    </p>
     <p class="mb-0"><small>{{ paper.update_date }}</small></p>
-    <a href="https://arxiv.org/pdf/{{ paper.id }}" target="_blank" class="btn btn-sm btn-link">Apri PDF</a>
+    <a href="https://arxiv.org/pdf/{{ paper.id }}" target="_blank" class="btn btn-sm btn-link">Open PDF</a>
   </div>
 </div>
 {% endfor %}
+
+<script>
+  if (window.MathJax) {
+    MathJax.typesetPromise();
+  }
+</script>

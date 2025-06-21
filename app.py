@@ -5,6 +5,7 @@ import bcrypt
 import math
 import hnswlib
 import numpy as np
+from collections import defaultdict, Counter
 from sentence_transformers import SentenceTransformer
 
 from datetime import datetime
@@ -12,9 +13,97 @@ from datetime import datetime
 app = Flask(__name__)
 app.secret_key = 'b4b91b05e5e8491eb7a90cf536ad2dd927e48cc61dca5212ad9e3d03ec223f2d'
 
+# === CONFIGURAZIONE GRAPH ===
+
+@app.route("/graph/<paper_id>")
+def graph(paper_id):
+    return render_template("graph.html", paper_id=paper_id)
+
+@app.route("/api/similarity_graph/<paper_id>")
+def similarity_graph(paper_id):
+    index, paper_ids = load_index_and_ids()
+    paper_ids = list(paper_ids)
+
+    if paper_id not in paper_ids:
+        return {"error": "Paper ID not found in index"}, 404
+
+    root_paper = papers_collection.find_one({"id": paper_id})
+    if not root_paper or "embedding" not in root_paper:
+        return {"error": "Paper not found or missing embedding"}, 404
+
+    root_embedding = np.array(root_paper["embedding"], dtype=np.float32).reshape(1, -1)
+    k = 50
+
+    labels, distances = index.knn_query(root_embedding, k=k)
+
+    nodes = []
+    edges = []
+    added_ids = set()
+
+    # Nodo root
+    nodes.append({
+        "id": paper_id,
+        "label": root_paper["title"][:60],
+        "category": root_paper["categories"],
+        "color": "red"
+    })
+    added_ids.add(paper_id)
+
+    level1 = []
+    for idx, dist in zip(labels[0], distances[0]):
+        similar_id = str(paper_ids[idx])
+        if similar_id == paper_id:
+            continue
+        similarity = 1 - dist
+        if similarity >= 0.40:
+            paper = papers_collection.find_one({"id": similar_id})
+            if not paper or "embedding" not in paper:
+                continue
+            nodes.append({
+                "id": similar_id,
+                "label": paper["title"][:60],
+                "category": paper["categories"],
+                "color": "lightblue"
+            })
+            edges.append({
+                "from": paper_id,
+                "to": similar_id,
+                "label": f"{similarity:.2f}"
+            })
+            added_ids.add(similar_id)
+            level1.append((similar_id, np.array(paper["embedding"], dtype=np.float32).reshape(1, -1)))
+
+    # Livello 2
+    for leaf_id, leaf_emb in level1:
+        labels2, distances2 = index.knn_query(leaf_emb, k=30)
+        for idx2, dist2 in zip(labels2[0], distances2[0]):
+            neighbor_id = str(paper_ids[idx2])
+            if neighbor_id in added_ids or neighbor_id == paper_id or neighbor_id == leaf_id:
+                continue
+            similarity2 = 1 - dist2
+            if similarity2 >= 0.50:
+                paper = papers_collection.find_one({"id": neighbor_id})
+                if not paper or "embedding" not in paper:
+                    continue
+                nodes.append({
+                    "id": neighbor_id,
+                    "label": paper["title"][:60],
+                    "category": paper["categories"],
+                    "color": "lightgreen"
+                })
+                edges.append({
+                    "from": leaf_id,
+                    "to": neighbor_id,
+                    "label": f"{similarity2:.2f}"
+                })
+                added_ids.add(neighbor_id)
+
+    return {"nodes": nodes, "edges": edges}
+
+
 # === CONFIGURAZIONE DB E HNSW ===
 client = MongoClient("mongodb://localhost:27017")
-db = client["arxiv_db"]
+db = client["arvix_db"]
 papers_collection = db["papers"]
 categories_collection = db["categories"]
 users_collection = db["users"]
@@ -46,7 +135,7 @@ def load_index_and_ids():
     index = hnswlib.Index(space="cosine", dim=DIM)
     index.load_index(INDEX_FILE)
     ids = np.load(IDS_FILE, allow_pickle=True)
-    return index, ids
+    return index, [str(i) for i in ids]
 
 
 def save_index_and_ids(index, ids):
@@ -75,16 +164,22 @@ def get_related_papers(paper_id):
     emb = emb.reshape(1, -1)
     labels, distances = index.knn_query(emb, k=TOP_K + 1)
 
-    related_ids = []
-    for idx in labels[0]:
+    related_results = []
+    for idx, dist in zip(labels[0], distances[0]):
         candidate_id = ids[idx]
         if candidate_id == paper_id:
             continue
-        related_ids.append(candidate_id)
-        if len(related_ids) >= TOP_K:
+        paper = papers_collection.find_one({"id": candidate_id})
+        if paper:
+            similarity = round(1 - dist, 3)
+            paper["similarity"] = similarity
+            related_results.append(paper)
+        if len(related_results) >= TOP_K:
             break
 
-    return list(papers_collection.find({"id": {"$in": related_ids}}))
+    # Ordina per similarità decrescente
+    related_results.sort(key=lambda x: x["similarity"], reverse=True)
+    return related_results
 
 
 # === ROTTE FLASK ===
@@ -156,7 +251,7 @@ def search():
         results.append({
             "id": paper.get("id"),
             "title": paper.get("title"),
-            "authors": paper.get("authors"),
+            "authors": paper.get("authors", "").strip(),
             "update_date": paper.get("update_date"),
             "category_title": category_title,
             "abstract": paper.get("abstract", "").strip(),
@@ -346,6 +441,53 @@ def related(paper_id):
     related_papers = get_related_papers(paper_id)
     return render_template("partials/related_cards.html", related_papers=related_papers)
 
+
+@app.route("/asn/<path:author>")
+def asn_graph(author):
+    return render_template("asn.html", author=author)
+
+
+@app.route("/api/asn/<author>")
+def authors_similarity_network(author):
+    def extract_authors(authors_str):
+        if not authors_str:
+            return []
+        authors_str = authors_str.replace(" and ", ",")
+        return [a.strip() for a in authors_str.split(",") if a.strip()]
+
+    papers = list(papers_collection.find({"authors": {"$regex": author, "$options": "i"}}))
+
+    coauthors_map = defaultdict(Counter)
+
+    for paper in papers:
+        authors = extract_authors(paper.get("authors", ""))
+        for a1 in authors:
+            for a2 in authors:
+                if a1 != a2:
+                    coauthors_map[a1][a2] += 1
+
+    nodes = []
+    edges = []
+    added = set()
+
+    for author_name in coauthors_map:
+        nodes.append({
+            "id": author_name,
+            "label": author_name,
+            "color": "red" if author_name == author else "lightblue"
+        })
+        added.add(author_name)
+
+    for a1, neighbors in coauthors_map.items():
+        for a2, count in neighbors.items():
+            if a2 in added and a1 < a2:  # evitare duplicati
+                edges.append({
+                    "from": a1,
+                    "to": a2,
+                    "label": str(count)
+                })
+
+    return {"nodes": nodes, "edges": edges}
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5050)
